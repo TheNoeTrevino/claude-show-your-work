@@ -2725,11 +2725,12 @@ export function remember(path: string, made: Shown) {
 // (its store is kept), in a process of its own (see moveTo). Off with
 // SHOW_YOUR_WORK_AUTO_UPDATE=0 or CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, and
 // never for an install pinned to a release tag.
-const REPO = 'iamumeransari/claude-show-your-work'
-const MARKETPLACE = 'iamumeransari'
+// This fork updates from its own main branch, on both channels.
+const REPO = 'TheNoeTrevino/claude-show-your-work'
+const MARKETPLACE = 'thenoetrevino'
 export const PLUGIN = 'show-your-work'
 const SOURCE = `https://github.com/${REPO}.git`
-export const BRANCHES = { stable: 'releases', latest: 'latest' } as const
+export const BRANCHES = { stable: 'main', latest: 'main' } as const
 type Branch = (typeof BRANCHES)[keyof typeof BRANCHES]
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -2807,8 +2808,8 @@ export async function findUpdate($: EngineInterface, current: string, branch: Br
   // No such branch yet, or no network: nothing to say about it.
   // Each channel's address written out in full, so the directory review can read it.
   const r = await (branch === BRANCHES.latest
-    ? $.http.fetch('https://raw.githubusercontent.com/iamumeransari/claude-show-your-work/latest/.claude-plugin/plugin.json')
-    : $.http.fetch('https://raw.githubusercontent.com/iamumeransari/claude-show-your-work/releases/.claude-plugin/plugin.json')
+    ? $.http.fetch('https://raw.githubusercontent.com/TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')
+    : $.http.fetch('https://raw.githubusercontent.com/TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')
   ).catch(() => null)
   if (!r?.ok) return { kind: 'offline' }
   const latest = String(jsonOf<{ version?: string }>(r.text, {}).version ?? '')
@@ -3013,7 +3014,7 @@ export function UpdatePane(ui: Ui, $: EngineInterface) {
     actions = [close]
   } else if (c.phase === 'failed') {
     head = "Couldn't install the update"
-    line = `Try again, or run: claude plugin update ${PLUGIN}@iamumeransari`
+    line = `Try again, or run: claude plugin update ${PLUGIN}@thenoetrevino`
     actions = [close]
   }
   return (
@@ -3407,14 +3408,20 @@ export function setUp($: EngineInterface): Promise<void> {
     const env = (login?.stdout.includes('os=') ? login : await run('-c')) ?? { stdout: '', stderr: '', exitCode: 1 }
     const got = (key: string) => env.stdout.split('\n').find(l => l.startsWith(`${key}=`))?.slice(key.length + 1).trim() ?? ''
     state.home = got('home') || ((await Promise.resolve().then(() => $.env.get('HOME')).catch(() => '')) ?? '')
-    state.isMac = got('os') !== 'Linux'
+    // Only a probe that says Darwin means macOS. Inside some Claude Code
+    // sessions (seen under WSL) the probe comes back empty, and guessing macOS
+    // then sends every picture to sips, which isn't there.
+    state.isMac = got('os') === 'Darwin'
     state.ffmpeg = got('ff') || (state.isMac ? '/opt/homebrew/bin/ffmpeg' : '/usr/bin/ffmpeg')
     state.ffprobe = got('fp') || (state.isMac ? '/opt/homebrew/bin/ffprobe' : '/usr/bin/ffprobe')
     state.hasVideoTools = false
-    // Over ssh the terminal can't read this machine's files: pictures go as bytes.
+    // Over ssh the terminal can't read this machine's files: pictures go as
+    // bytes. Under WSL the terminal is a Windows program that can't read the
+    // Linux paths either.
     const sshConnection = await Promise.resolve().then(() => $.env.get('SSH_CONNECTION')).catch(() => undefined)
     const sshTty = await Promise.resolve().then(() => $.env.get('SSH_TTY')).catch(() => undefined)
-    if (sshConnection || sshTty) state.sendBytes = true
+    const wsl = await Promise.resolve().then(() => $.env.get('WSL_DISTRO_NAME')).catch(() => undefined)
+    if (sshConnection || sshTty || wsl) state.sendBytes = true
     const engine = await Promise.resolve().then(() => $.session.version()).catch(() => null)
     state.canColourButtons = !!engine && isAtLeast(engine.base ?? engine.version, '2.1.295')
     await Promise.resolve().then(() => measureCells($)).catch(() => undefined)

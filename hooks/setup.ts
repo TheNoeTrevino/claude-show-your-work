@@ -35,14 +35,20 @@ export function setUp($: EngineInterface): Promise<void> {
     const env = (login?.stdout.includes('os=') ? login : await run('-c')) ?? { stdout: '', stderr: '', exitCode: 1 }
     const got = (key: string) => env.stdout.split('\n').find(l => l.startsWith(`${key}=`))?.slice(key.length + 1).trim() ?? ''
     state.home = got('home') || ((await Promise.resolve().then(() => $.env.get('HOME')).catch(() => '')) ?? '')
-    state.isMac = got('os') !== 'Linux'
+    // Only a probe that says Darwin means macOS. Inside some Claude Code
+    // sessions (seen under WSL) the probe comes back empty, and guessing macOS
+    // then sends every picture to sips, which isn't there.
+    state.isMac = got('os') === 'Darwin'
     state.ffmpeg = got('ff') || (state.isMac ? '/opt/homebrew/bin/ffmpeg' : '/usr/bin/ffmpeg')
     state.ffprobe = got('fp') || (state.isMac ? '/opt/homebrew/bin/ffprobe' : '/usr/bin/ffprobe')
     state.hasVideoTools = false
-    // Over ssh the terminal can't read this machine's files: pictures go as bytes.
+    // Over ssh the terminal can't read this machine's files: pictures go as
+    // bytes. Under WSL the terminal is a Windows program that can't read the
+    // Linux paths either.
     const sshConnection = await Promise.resolve().then(() => $.env.get('SSH_CONNECTION')).catch(() => undefined)
     const sshTty = await Promise.resolve().then(() => $.env.get('SSH_TTY')).catch(() => undefined)
-    if (sshConnection || sshTty) state.sendBytes = true
+    const wsl = await Promise.resolve().then(() => $.env.get('WSL_DISTRO_NAME')).catch(() => undefined)
+    if (sshConnection || sshTty || wsl) state.sendBytes = true
     const engine = await Promise.resolve().then(() => $.session.version()).catch(() => null)
     state.canColourButtons = !!engine && isAtLeast(engine.base ?? engine.version, '2.1.295')
     await Promise.resolve().then(() => measureCells($)).catch(() => undefined)

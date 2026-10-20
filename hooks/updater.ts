@@ -18,11 +18,12 @@ import { track } from './telemetry'
 // (its store is kept), in a process of its own (see moveTo). Off with
 // SHOW_YOUR_WORK_AUTO_UPDATE=0 or CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, and
 // never for an install pinned to a release tag.
-const REPO = 'iamumeransari/claude-show-your-work'
-const MARKETPLACE = 'iamumeransari'
+// This fork updates from its own main branch, on both channels.
+const REPO = 'TheNoeTrevino/claude-show-your-work'
+const MARKETPLACE = 'thenoetrevino'
 export const PLUGIN = 'show-your-work'
 const SOURCE = `https://github.com/${REPO}.git`
-export const BRANCHES = { stable: 'releases', latest: 'latest' } as const
+export const BRANCHES = { stable: 'main', latest: 'main' } as const
 type Branch = (typeof BRANCHES)[keyof typeof BRANCHES]
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -100,8 +101,8 @@ export async function findUpdate($: EngineInterface, current: string, branch: Br
   // No such branch yet, or no network: nothing to say about it.
   // Each channel's address written out in full, so the directory review can read it.
   const r = await (branch === BRANCHES.latest
-    ? $.http.fetch('https://raw.githubusercontent.com/iamumeransari/claude-show-your-work/latest/.claude-plugin/plugin.json')
-    : $.http.fetch('https://raw.githubusercontent.com/iamumeransari/claude-show-your-work/releases/.claude-plugin/plugin.json')
+    ? $.http.fetch('https://raw.githubusercontent.com/TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')
+    : $.http.fetch('https://raw.githubusercontent.com/TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')
   ).catch(() => null)
   if (!r?.ok) return { kind: 'offline' }
   const latest = String(jsonOf<{ version?: string }>(r.text, {}).version ?? '')

@@ -26,8 +26,8 @@ function engine(o: { latest?: string; installed?: string; source?: string; ref?:
         if (o.missingBinaries?.includes(argv[0]!)) throw new Error('ENOENT')
         runs.push(argv)
         const args = argv.slice(1).join(' ')
-        if (args === 'plugin marketplace list --json') return { exitCode: 0, stderr: '', stdout: JSON.stringify([{ name: 'iamumeransari', source: o.source ?? 'git', url: 'https://github.com/iamumeransari/claude-show-your-work.git', ref: o.ref === null ? undefined : o.ref ?? 'releases' }]) }
-        if (args === 'plugin list --json') return { exitCode: 0, stderr: '', stdout: JSON.stringify([{ id: 'show-your-work@iamumeransari', scope: 'user', version: installed }]) }
+        if (args === 'plugin marketplace list --json') return { exitCode: 0, stderr: '', stdout: JSON.stringify([{ name: 'thenoetrevino', source: o.source ?? 'git', url: 'https://github.com/TheNoeTrevino/claude-show-your-work.git', ref: o.ref === null ? undefined : o.ref ?? 'main' }]) }
+        if (args === 'plugin list --json') return { exitCode: 0, stderr: '', stdout: JSON.stringify([{ id: 'show-your-work@thenoetrevino', scope: 'user', version: installed }]) }
         if (args.startsWith('plugin update')) return { exitCode: o.updateExit ?? 0, stderr: '', stdout: '' }
         if (args.startsWith('plugin marketplace add') && args.includes('#')) return { exitCode: o.addExit ?? 0, stderr: '', stdout: '' }
         if (args.startsWith('plugin install') && installFails > 0) {
@@ -50,8 +50,8 @@ test('a newer version on GitHub gets installed quietly, for the next session', a
   expect(args(e.runs)).toEqual([
     'plugin marketplace list --json',
     'plugin list --json',
-    'plugin marketplace update iamumeransari',
-    'plugin update show-your-work@iamumeransari --scope user',
+    'plugin marketplace update thenoetrevino',
+    'plugin update show-your-work@thenoetrevino --scope user',
   ])
   expect(e.toasts.length).toBe(0)
   // Installed: a line under the prompt says a restart picks it up.
@@ -88,40 +88,21 @@ test('an install pinned to a release tag stays on it', async () => {
   expect(args(e.runs)).toEqual(['plugin marketplace list --json'])
 })
 
-test('Stable releases read the releases branch, Latest the latest branch', async () => {
+test('both channels read the fork\'s main branch', async () => {
   const stable = engine()
   await checkForUpdate(stable.$, '0.5.0')
-  expect(stable.fetched[0]!.includes('/releases/.claude-plugin/plugin.json')).toBe(true)
-  const latest = engine({ ref: 'latest' })
+  expect(stable.fetched[0]!.includes('TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')).toBe(true)
+  const latest = engine()
   await checkForUpdate(latest.$, '0.5.0', BRANCHES.latest)
-  expect(latest.fetched[0]!.includes('/latest/.claude-plugin/plugin.json')).toBe(true)
-  expect(args(latest.runs)).toContain('plugin update show-your-work@iamumeransari --scope user')
+  expect(latest.fetched[0]!.includes('TheNoeTrevino/claude-show-your-work/main/.claude-plugin/plugin.json')).toBe(true)
+  expect(args(latest.runs)).toContain('plugin update show-your-work@thenoetrevino --scope user')
 })
 
-for (const ref of ['main', null] as const) {
-  test(`an install on ${ref ?? 'no branch'} moves to the releases branch, in a process of its own`, async () => {
-    const e = engine({ ref })
-    await checkForUpdate(e.$, '0.5.0')
-    const launch = e.runs.at(-1)!
-    // Detached, so quitting Claude Code mid-move can't stop it halfway.
-    expect(launch.slice(0, 3)).toEqual(['perl', '-MPOSIX', '-e'])
-    expect(launch.slice(4, 6)).toEqual(['sh', '-c'])
-    expect(launch[6]).toBe(MOVE_SH)
-    expect(launch.slice(8)).toEqual([
-      'claude', 'https://github.com/iamumeransari/claude-show-your-work.git', 'releases',
-      ref ? 'https://github.com/iamumeransari/claude-show-your-work.git#main' : 'https://github.com/iamumeransari/claude-show-your-work.git',
-      'user', 'iamumeransari', 'show-your-work@iamumeransari',
-    ])
-    expect(e.toasts.length).toBe(0)
-  })
-}
-
-test('switching to Latest moves a releases install to the latest branch', async () => {
-  const e = engine({ ref: 'releases' })
-  await checkForUpdate(e.$, '0.5.0', BRANCHES.latest)
-  const launch = e.runs.at(-1)!
-  expect(launch[10]).toBe('latest')
-  expect(launch[11]).toBe('https://github.com/iamumeransari/claude-show-your-work.git#releases')
+test('an install on no branch counts as main and updates in place', async () => {
+  const e = engine({ ref: null })
+  await checkForUpdate(e.$, '0.5.0')
+  expect(e.runs.some(r => r[0] === 'perl')).toBe(false)
+  expect(args(e.runs)).toContain('plugin update show-your-work@thenoetrevino --scope user')
 })
 
 test('a plugin loaded from a folder is never updated', async () => {
@@ -147,7 +128,7 @@ test('when claude is not on the PATH it is found where it is usually installed',
   const e = engine({ missingBinaries: ['claude'] })
   await checkForUpdate(e.$, '0.5.0')
   expect(e.runs[0]![0]!.endsWith('/claude')).toBe(true)
-  expect(args(e.runs)).toContain('plugin update show-your-work@iamumeransari --scope user')
+  expect(args(e.runs)).toContain('plugin update show-your-work@thenoetrevino --scope user')
 })
 
 test('an old no to updates (0.5.12, 0.5.16) no longer stops them', async () => {

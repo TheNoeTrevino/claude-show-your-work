@@ -152,7 +152,7 @@ export function UpdatePane(ui: Ui, $: EngineInterface) {
     actions = [close]
   } else if (c.phase === 'failed') {
     head = "Couldn't install the update"
-    line = `Try again, or run: claude plugin update ${PLUGIN}@iamumeransari`
+    line = `Try again, or run: claude plugin update ${PLUGIN}@thenoetrevino`
     actions = [close]
   }
   return (
